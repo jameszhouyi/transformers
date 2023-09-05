@@ -19,7 +19,7 @@ python run_clm_flax.py \
     --tokenizer_name="./norwegian-gpt2" \
     --dataset_name="oscar" \
     --dataset_config_name="unshuffled_deduplicated_no" \
-    --do_train --do_eval \
+    --do_train \
     --block_size="512" \
     --per_device_train_batch_size="64" \
     --per_device_eval_batch_size="64" \
@@ -30,5 +30,6 @@ python run_clm_flax.py \
     --logging_steps="500" \
     --save_steps="2500" \
     --eval_steps="2500" \
-    --dtype="bfloat16"
+    --dtype="bfloat16" \
+    --num_train_iter="100"
 
