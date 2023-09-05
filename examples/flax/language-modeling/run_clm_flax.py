@@ -754,20 +754,29 @@ def main():
     # Replicate the train state on each device
     state = state.replicate()
 
+    #logger.info("***** Running training *****")
+    #logger.info(f"  Num examples = {len(train_dataset)}")
+    #logger.info(f"  Num Epochs = {num_epochs}")
+    #logger.info(f"  Instantaneous batch size per device = {training_args.per_device_train_batch_size}")
+    #logger.info(f"  Total train batch size (w. parallel & distributed) = {train_batch_size}")
+    #logger.info(f"  Total optimization steps = {total_train_steps}")
+
+    num_train_iter=100
+
     logger.info("***** Running training *****")
-    logger.info(f"  Num examples = {len(train_dataset)}")
     logger.info(f"  Num Epochs = {num_epochs}")
     logger.info(f"  Instantaneous batch size per device = {training_args.per_device_train_batch_size}")
     logger.info(f"  Total train batch size (w. parallel & distributed) = {train_batch_size}")
-    logger.info(f"  Total optimization steps = {total_train_steps}")
+    logger.info(f"  Num train iteration per epoch = {num_train_iter}")
 
-    train_time = 0
+    #train_time = 0
     train_metrics = []
     epochs = tqdm(range(num_epochs), desc="Epoch ... ", position=0)
     total_throughput = 0
     for epoch in epochs:
         # ======================== Training ================================
-        train_start = time.time()
+        epoch_train_time = 0
+        #train_start = time.time()
 
         # Create sampling rng
         rng, input_rng = jax.random.split(rng)
@@ -778,80 +787,86 @@ def main():
         steps_per_epoch = num_train_iter
         # train
         for step in tqdm(range(steps_per_epoch), desc="Training...", position=1, leave=False):
+            step_train_start = time.time()
             batch = next(train_loader)
             batch = shard(batch)
             state, train_metric = p_train_step(state, batch)
             train_metrics.append(train_metric)
 
             #cur_step = epoch * (len(train_dataset) // train_batch_size) + step
-            cur_step = epoch * num_train_iter + step
-            train_time += time.time() - train_start
+            #cur_step = epoch * num_train_iter + step
+            epoch_train_time += time.time() - step_train_start
 
-            if cur_step % training_args.logging_steps == 0 and cur_step > 0:
-                # Save metrics
-                train_metric = unreplicate(train_metric)
-                train_time += time.time() - train_start
-                if has_tensorboard and jax.process_index() == 0:
-                    write_train_metric(summary_writer, train_metrics, train_time, cur_step)
-
-                epochs.write(
-                    f"Step... ({cur_step} | Loss: {train_metric['loss'].mean()}, Learning Rate:"
-                    f" {train_metric['learning_rate'].mean()})"
-                )
-
-                train_metrics = []
-
-            if cur_step % training_args.eval_steps == 0 and cur_step > 0:
-                # ======================== Evaluating ==============================
-                eval_metrics = []
-                eval_loader = data_loader(input_rng, eval_dataset, eval_batch_size, drop_last=False)
-                eval_steps = math.ceil(len(eval_dataset) / eval_batch_size)
-                for _ in tqdm(range(eval_steps), desc="Evaluating...", position=2, leave=False):
-                    # Model forward
-                    batch = next(eval_loader)
-                    metrics = pad_shard_unpad(p_eval_step, static_return=True)(
-                        state.params, batch, min_device_batch=per_device_eval_batch_size
-                    )
-                    eval_metrics.append(metrics)
-
-                # normalize eval metrics
-                eval_metrics = get_metrics(eval_metrics)
-                eval_metrics = jax.tree_util.tree_map(jnp.mean, eval_metrics)
-
-                try:
-                    eval_metrics["perplexity"] = math.exp(eval_metrics["loss"])
-                except OverflowError:
-                    eval_metrics["perplexity"] = float("inf")
-
-                # Print metrics and update progress bar
-                desc = (
-                    f"Step... ({cur_step} | Eval Loss: {eval_metrics['loss']} | Eval Perplexity:"
-                    f" {eval_metrics['perplexity']})"
-                )
-                epochs.write(desc)
-                epochs.desc = desc
-
-                # Save metrics
-                if has_tensorboard and jax.process_index() == 0:
-                    write_eval_metric(summary_writer, eval_metrics, cur_step)
-
-            if cur_step % training_args.save_steps == 0 and cur_step > 0:
-                # save checkpoint after each epoch and push checkpoint to the hub
-                if jax.process_index() == 0:
-                    params = jax.device_get(unreplicate(state.params))
-                    model.save_pretrained(training_args.output_dir, params=params)
-                    tokenizer.save_pretrained(training_args.output_dir)
-                    if training_args.push_to_hub:
-                        repo.push_to_hub(commit_message=f"Saving weights and logs of step {cur_step}", blocking=False)
+            #if cur_step % training_args.logging_steps == 0 and cur_step > 0:
+            #    # Save metrics
+            #    train_metric = unreplicate(train_metric)
+            #    train_time += time.time() - train_start
+            #    if has_tensorboard and jax.process_index() == 0:
+            #        write_train_metric(summary_writer, train_metrics, train_time, cur_step)
+            #
+            #    epochs.write(
+            #        f"Step... ({cur_step} | Loss: {train_metric['loss'].mean()}, Learning Rate:"
+            #        f" {train_metric['learning_rate'].mean()})"
+            #    )
+            #
+            #    train_metrics = []
+            #
+            #if cur_step % training_args.eval_steps == 0 and cur_step > 0:
+            #    # ======================== Evaluating ==============================
+            #    eval_metrics = []
+            #    eval_loader = data_loader(input_rng, eval_dataset, eval_batch_size, drop_last=False)
+            #    eval_steps = math.ceil(len(eval_dataset) / eval_batch_size)
+            #    for _ in tqdm(range(eval_steps), desc="Evaluating...", position=2, leave=False):
+            #        # Model forward
+            #        batch = next(eval_loader)
+            #        metrics = pad_shard_unpad(p_eval_step, static_return=True)(
+            #            state.params, batch, min_device_batch=per_device_eval_batch_size
+            #        )
+            #        eval_metrics.append(metrics)
+            #
+            #    # normalize eval metrics
+            #    eval_metrics = get_metrics(eval_metrics)
+            #    eval_metrics = jax.tree_util.tree_map(jnp.mean, eval_metrics)
+            #
+            #    try:
+            #        eval_metrics["perplexity"] = math.exp(eval_metrics["loss"])
+            #    except OverflowError:
+            #        eval_metrics["perplexity"] = float("inf")
+            #
+            #    # Print metrics and update progress bar
+            #    desc = (
+            #        f"Step... ({cur_step} | Eval Loss: {eval_metrics['loss']} | Eval Perplexity:"
+            #        f" {eval_metrics['perplexity']})"
+            #    )
+            #    epochs.write(desc)
+            #    epochs.desc = desc
+            #
+            #    # Save metrics
+            #    if has_tensorboard and jax.process_index() == 0:
+            #        write_eval_metric(summary_writer, eval_metrics, cur_step)
+            #
+            #if cur_step % training_args.save_steps == 0 and cur_step > 0:
+            #    # save checkpoint after each epoch and push checkpoint to the hub
+            #    if jax.process_index() == 0:
+            #        params = jax.device_get(unreplicate(state.params))
+            #        model.save_pretrained(training_args.output_dir, params=params)
+            #        tokenizer.save_pretrained(training_args.output_dir)
+            #        if training_args.push_to_hub:
+            #            repo.push_to_hub(commit_message=f"Saving weights and logs of step {cur_step}", blocking=False)
             
         # Throughput per epoch
-        throughput = num_train_iter * train_batch_size / train_time
-        print("Epoch #{epoch} training throughput: {} samples/s".format(throughput))
-        total_throughput += throughput
+        print("============== Performance =================")
+        print("  num_train_iter=",num_train_iter)
+        print("  train_batch_size=",train_batch_size)
+        print("  epoch_train_time=",epoch_train_time)
+        epoch_throughput = num_train_iter * train_batch_size / epoch_train_time
+        epoch_seq = epoch + 1
+        print(" Epoch #", epoch_seq, "train throughput: {} samples/s".format(epoch_throughput))
+        total_throughput += epoch_throughput
     
     # Average Throughput
     avg_throughput = total_throughput / num_epochs
-    print("AVG. training throughput: {} samples/s".format(avg_throughput))
+    print("AVG. train throughput: {} samples/s".format(avg_throughput))
 
     # Eval after training
     if training_args.do_eval:
