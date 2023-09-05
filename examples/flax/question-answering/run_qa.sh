@@ -1,5 +1,5 @@
 pip install -r ./requirements.txt
-export ZE_AFFINITY_MASK=3.0
+export ZE_AFFINITY_MASK=0.0
 python run_qa.py   \
 --model_name_or_path bert-large-uncased-whole-word-masking   \
 --dataset_name squad   \
