@@ -761,7 +761,7 @@ def main():
     #logger.info(f"  Total train batch size (w. parallel & distributed) = {train_batch_size}")
     #logger.info(f"  Total optimization steps = {total_train_steps}")
 
-    num_train_iter=100
+    num_train_iter=300
 
     logger.info("***** Running training *****")
     logger.info(f"  Num Epochs = {num_epochs}")
@@ -855,7 +855,7 @@ def main():
             #            repo.push_to_hub(commit_message=f"Saving weights and logs of step {cur_step}", blocking=False)
             
         # Throughput per epoch
-        print("============== Performance =================")
+        print("===== Epoch Performance Metrics =====")
         print("  num_train_iter=",num_train_iter)
         print("  train_batch_size=",train_batch_size)
         print("  epoch_train_time=",epoch_train_time)
@@ -865,6 +865,7 @@ def main():
         total_throughput += epoch_throughput
     
     # Average Throughput
+    print("===== Average Performance Metrics across Epoches =====")
     avg_throughput = total_throughput / num_epochs
     print("AVG. train throughput: {} samples/s".format(avg_throughput))
 
