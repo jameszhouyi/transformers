@@ -109,6 +109,7 @@ class TrainingArguments:
         default=None, metadata={"help": "The name of the repository to keep in sync with the local `output_dir`."}
     )
     hub_token: str = field(default=None, metadata={"help": "The token to use to push to the Model Hub."})
+    num_train_iter: int = field(default=100, metadata={"help": "Total number of training iteration to perform."})
 
     def __post_init__(self):
         if self.output_dir is not None:
@@ -763,6 +764,7 @@ def main():
     train_time = 0
     train_metrics = []
     epochs = tqdm(range(num_epochs), desc="Epoch ... ", position=0)
+    total_throughput = 0
     for epoch in epochs:
         # ======================== Training ================================
         train_start = time.time()
@@ -772,7 +774,8 @@ def main():
 
         # Generate an epoch by shuffling sampling indices from the train dataset
         train_loader = data_loader(input_rng, train_dataset, train_batch_size, shuffle=True)
-        steps_per_epoch = len(train_dataset) // train_batch_size
+        #steps_per_epoch = len(train_dataset) // train_batch_size
+        steps_per_epoch = 100
         # train
         for step in tqdm(range(steps_per_epoch), desc="Training...", position=1, leave=False):
             batch = next(train_loader)
@@ -780,7 +783,9 @@ def main():
             state, train_metric = p_train_step(state, batch)
             train_metrics.append(train_metric)
 
-            cur_step = epoch * (len(train_dataset) // train_batch_size) + step
+            #cur_step = epoch * (len(train_dataset) // train_batch_size) + step
+            cur_step = epoch * 100 + step
+            train_time += time.time() - train_start
 
             if cur_step % training_args.logging_steps == 0 and cur_step > 0:
                 # Save metrics
@@ -838,6 +843,15 @@ def main():
                     tokenizer.save_pretrained(training_args.output_dir)
                     if training_args.push_to_hub:
                         repo.push_to_hub(commit_message=f"Saving weights and logs of step {cur_step}", blocking=False)
+            
+        # Throughput per epoch
+        throughput = 100 * train_batch_size / train_time
+        print("Epoch #{epoch} training throughput: {} samples/s".format(throughput))
+        total_throughput += throughput
+    
+    # Average Throughput
+    avg_throughput = total_throughput / num_epochs
+    print("AVG. training throughput: {} samples/s".format(avg_throughput))
 
     # Eval after training
     if training_args.do_eval:
