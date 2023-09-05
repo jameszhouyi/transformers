@@ -775,7 +775,7 @@ def main():
         # Generate an epoch by shuffling sampling indices from the train dataset
         train_loader = data_loader(input_rng, train_dataset, train_batch_size, shuffle=True)
         #steps_per_epoch = len(train_dataset) // train_batch_size
-        steps_per_epoch = 100
+        steps_per_epoch = num_train_iter
         # train
         for step in tqdm(range(steps_per_epoch), desc="Training...", position=1, leave=False):
             batch = next(train_loader)
@@ -784,7 +784,7 @@ def main():
             train_metrics.append(train_metric)
 
             #cur_step = epoch * (len(train_dataset) // train_batch_size) + step
-            cur_step = epoch * 100 + step
+            cur_step = epoch * num_train_iter + step
             train_time += time.time() - train_start
 
             if cur_step % training_args.logging_steps == 0 and cur_step > 0:
@@ -845,7 +845,7 @@ def main():
                         repo.push_to_hub(commit_message=f"Saving weights and logs of step {cur_step}", blocking=False)
             
         # Throughput per epoch
-        throughput = 100 * train_batch_size / train_time
+        throughput = num_train_iter * train_batch_size / train_time
         print("Epoch #{epoch} training throughput: {} samples/s".format(throughput))
         total_throughput += throughput
     
