@@ -662,6 +662,7 @@ def main():
     eval_batch_size = per_device_eval_batch_size * jax.device_count()
     steps_per_epoch = len(train_dataset) // train_batch_size
     total_train_steps = steps_per_epoch * num_epochs
+    train_num_warmup_steps = int(training_args.warmup_steps)
 
     # Create learning rate schedule
     linear_decay_lr_schedule_fn = create_learning_rate_fn(
@@ -768,11 +769,36 @@ def main():
     logger.info(f"  Instantaneous batch size per device = {training_args.per_device_train_batch_size}")
     logger.info(f"  Total train batch size (w. parallel & distributed) = {train_batch_size}")
     logger.info(f"  Num train iteration per epoch = {num_train_iter}")
+    logger.info(f"  Num train warm up iteration = {train_num_warmup_steps}")
 
+    if (train_num_warmup_steps != "" and train_num_warmup_steps > 0):
+        # ======================== Warm Up ================================
+        warm_up_train_time = 0
+
+        # Create sampling rng
+        rng, input_rng = jax.random.split(rng)
+
+        # Generate an epoch by shuffling sampling indices from the train dataset
+        train_loader = data_loader(input_rng, train_dataset, train_batch_size, shuffle=True)
+        #steps_per_epoch = len(train_dataset) // train_batch_size
+        warm_ups = train_num_warmup_steps
+        # train
+        for step in tqdm(range(warm_ups), desc="Warm Up ...", position=0):
+            warm_up_train_start = time.time()
+            batch = next(train_loader)
+            batch = shard(batch)
+            state, train_metric = p_train_step(state, batch)
+
+            cur_step = step + 1
+            warm_up_train_time = time.time() - warm_up_train_start
+            
+            logger.info(f"  Iteration... | Warm Up Train Time: {warm_up_train_time}")
+    
     #train_time = 0
     train_metrics = []
     epochs = tqdm(range(num_epochs), desc="Epoch ... ", position=0)
     total_throughput = 0
+
     for epoch in epochs:
         # ======================== Training ================================
         epoch_train_time = 0
@@ -786,7 +812,7 @@ def main():
         #steps_per_epoch = len(train_dataset) // train_batch_size
         steps_per_epoch = num_train_iter
         # train
-        for step in tqdm(range(steps_per_epoch), desc="Training...", position=1, leave=False):
+        for step in tqdm(range(steps_per_epoch), desc="Training...", position=0):
             step_train_start = time.time()
             batch = next(train_loader)
             batch = shard(batch)
@@ -861,7 +887,7 @@ def main():
             #            repo.push_to_hub(commit_message=f"Saving weights and logs of step {cur_step}", blocking=False)
             
         # Throughput per epoch
-        print("===== Epoch Performance Metrics =====")
+        print("      ===== Epoch Performance Metrics =====")
         print("      num_train_iter=",num_train_iter)
         print("      train_batch_size=",train_batch_size)
         print("      epoch_train_time=",epoch_train_time)
@@ -873,7 +899,7 @@ def main():
     # Average Throughput
     print("===== Average Performance Metrics across Epoches =====")
     avg_throughput = total_throughput / num_epochs
-    print("AVG. train throughput: {} samples/s".format(avg_throughput))
+    print("AVG. Train Throughput: {} samples/s".format(avg_throughput))
 
     # Eval after training
     if training_args.do_eval:
