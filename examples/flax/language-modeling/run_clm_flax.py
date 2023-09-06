@@ -761,7 +761,7 @@ def main():
     #logger.info(f"  Total train batch size (w. parallel & distributed) = {train_batch_size}")
     #logger.info(f"  Total optimization steps = {total_train_steps}")
 
-    num_train_iter=300
+    num_train_iter=100
 
     logger.info("***** Running training *****")
     logger.info(f"  Num Epochs = {num_epochs}")
@@ -794,8 +794,14 @@ def main():
             train_metrics.append(train_metric)
 
             #cur_step = epoch * (len(train_dataset) // train_batch_size) + step
-            #cur_step = epoch * num_train_iter + step
-            epoch_train_time += time.time() - step_train_start
+            cur_step = step + 1
+            step_train_time = time.time() - step_train_start
+            epoch_train_time += step_train_time
+            
+            train_metric = unreplicate(train_metric)
+            epochs.write(
+                 f"Iteration... ({cur_step} | Train Time: {step_train_time})"
+            )
 
             #if cur_step % training_args.logging_steps == 0 and cur_step > 0:
             #    # Save metrics
@@ -856,12 +862,12 @@ def main():
             
         # Throughput per epoch
         print("===== Epoch Performance Metrics =====")
-        print("  num_train_iter=",num_train_iter)
-        print("  train_batch_size=",train_batch_size)
-        print("  epoch_train_time=",epoch_train_time)
+        print("      num_train_iter=",num_train_iter)
+        print("      train_batch_size=",train_batch_size)
+        print("      epoch_train_time=",epoch_train_time)
         epoch_throughput = num_train_iter * train_batch_size / epoch_train_time
         epoch_seq = epoch + 1
-        print(" Epoch #", epoch_seq, "train throughput: {} samples/s".format(epoch_throughput))
+        print("      Epoch #", epoch_seq, "train throughput: {} samples/s".format(epoch_throughput))
         total_throughput += epoch_throughput
     
     # Average Throughput
