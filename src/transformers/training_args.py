@@ -230,6 +230,8 @@ class TrainingArguments:
         num_train_epochs(`float`, *optional*, defaults to 3.0):
             Total number of training epochs to perform (if not an integer, will perform the decimal part percents of
             the last epoch before stopping training).
+        num_iterations(`int`, *optional*, defaults to 100):
+            Total number of training iteration to perform.  
         max_steps (`int`, *optional*, defaults to -1):
             If set to a positive number, the total number of training steps to perform. Overrides `num_train_epochs`.
             In case of using a finite iterable dataset the training may stop before reaching the set number of steps
@@ -713,6 +715,7 @@ class TrainingArguments:
     max_grad_norm: float = field(default=1.0, metadata={"help": "Max gradient norm."})
 
     num_train_epochs: float = field(default=3.0, metadata={"help": "Total number of training epochs to perform."})
+    num_iterations: int = field(default=100, metadata={"help": "Total number of training iteration to perform."})
     max_steps: int = field(
         default=-1,
         metadata={"help": "If > 0: set total number of training steps to perform. Override num_train_epochs."},

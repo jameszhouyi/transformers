@@ -109,7 +109,7 @@ class TrainingArguments:
         default=None, metadata={"help": "The name of the repository to keep in sync with the local `output_dir`."}
     )
     hub_token: str = field(default=None, metadata={"help": "The token to use to push to the Model Hub."})
-    num_train_iter: int = field(default=100, metadata={"help": "Total number of training iteration to perform."})
+    num_iterations: int = field(default=100, metadata={"help": "Total number of training iteration to perform."})
 
     def __post_init__(self):
         if self.output_dir is not None:
@@ -762,13 +762,13 @@ def main():
     #logger.info(f"  Total train batch size (w. parallel & distributed) = {train_batch_size}")
     #logger.info(f"  Total optimization steps = {total_train_steps}")
 
-    num_train_iter=100
+    num_train_iterations=int(training_args.num_iterations)
 
     logger.info("***** Running training *****")
     logger.info(f"  Num Epochs = {num_epochs}")
     logger.info(f"  Instantaneous batch size per device = {training_args.per_device_train_batch_size}")
     logger.info(f"  Total train batch size (w. parallel & distributed) = {train_batch_size}")
-    logger.info(f"  Num train iteration per epoch = {num_train_iter}")
+    logger.info(f"  Num train iteration per epoch = {num_train_iterations}")
     logger.info(f"  Num train warm up iteration = {train_num_warmup_steps}")
 
     if (train_num_warmup_steps != "" and train_num_warmup_steps > 0):
@@ -810,7 +810,7 @@ def main():
         # Generate an epoch by shuffling sampling indices from the train dataset
         train_loader = data_loader(input_rng, train_dataset, train_batch_size, shuffle=True)
         #steps_per_epoch = len(train_dataset) // train_batch_size
-        steps_per_epoch = num_train_iter
+        steps_per_epoch = num_train_iterations
         # train
         for step in tqdm(range(steps_per_epoch), desc="Training...", position=0):
             step_train_start = time.time()
@@ -888,10 +888,10 @@ def main():
             
         # Throughput per epoch
         print("      ===== Epoch Performance Metrics =====")
-        print("      num_train_iter=",num_train_iter)
+        print("      num_iterations=",num_train_iterations)
         print("      train_batch_size=",train_batch_size)
         print("      epoch_train_time=",epoch_train_time)
-        epoch_throughput = num_train_iter * train_batch_size / epoch_train_time
+        epoch_throughput = num_train_iterations * train_batch_size / epoch_train_time
         epoch_seq = epoch + 1
         print("      Epoch #", epoch_seq, "train throughput: {} samples/s".format(epoch_throughput))
         total_throughput += epoch_throughput
